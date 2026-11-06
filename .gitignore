@@ -1,0 +1,17 @@
+# Build output and local preferences
+/.build/
+/dist/
+**/settings.json
+**/settings.json.tmp
+**/markets.json
+*.exe
+*.dll
+*.pdb
+*.zip
+.vs/
+*.user
+.DS_Store
+Thumbs.db
+**/.build/
+**/.swiftpm/
+*.app/

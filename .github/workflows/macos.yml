@@ -1,0 +1,36 @@
+name: macOS preview build
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Verify runner architecture
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: test "$(uname -m)" = "$EXPECTED_ARCH"
+      - name: Test and package native macOS preview
+        run: bash scripts/package-macos.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: QuietQuote-macos-${{ matrix.arch }}-preview
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,8 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "Build QuietQuote", "type": "process", "command": "powershell", "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/build.ps1"], "group": {"kind": "build", "isDefault": true}, "problemMatcher": "$msCompile" },
+    { "label": "Test QuietQuote", "type": "process", "command": "powershell", "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/test.ps1"], "group": "test", "problemMatcher": [] },
+    { "label": "Package QuietQuote", "type": "process", "command": "powershell", "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/package.ps1"], "problemMatcher": [] }
+  ]
+}

@@ -1,0 +1,25 @@
+name: Windows build
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Build, offline tests, and package
+        shell: powershell
+        run: ./scripts/package.ps1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: QuietQuote-windows
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
