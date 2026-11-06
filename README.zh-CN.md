@@ -1,3 +1,7 @@
+# [⬇ 下载链接 / Download](https://github.com/Fred-Huangchenyuan/QuietQuote/releases)
+
+进入发布页面后，在 **Assets** 中选择 Windows ZIP 压缩包。macOS 版为实验性预览，状态说明见下方。
+
 # QuietQuote
 
 这个文件夹可直接提交到GitHub，见[最简上传步骤](UPLOAD.zh-CN.md)。Windows版已本地验证；新增[macOS原生预览源码](macos/README.md)及Apple Silicon/Intel自动构建，**尚未在Mac上编译或实测**。请先确认Mac CI成功，再进行真机验收。
@@ -14,7 +18,7 @@
 
 ## 下载与使用
 
-从仓库的 **Releases → Assets** 下载 `QuietQuote-v1.3.0-windows.zip`，解压到可写文件夹，双击 `QuietQuote.exe`。升级前从托盘退出旧版。复制旧 `settings.json` 可保留偏好。
+从 [**Releases 下载页面**](https://github.com/Fred-Huangchenyuan/QuietQuote/releases)的 **Assets** 下载 `QuietQuote-v1.3.0-windows.zip`，解压到可写文件夹，双击 `QuietQuote.exe`。升级前从托盘退出旧版。复制旧 `settings.json` 可保留偏好。
 
 建议 Windows 10/11 + .NET Framework 4.8。无需安装、管理员权限或额外字体。当前版本未做代码签名。
 

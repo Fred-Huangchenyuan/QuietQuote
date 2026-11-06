@@ -1,3 +1,7 @@
+# [⬇ Download / 下载](https://github.com/Fred-Huangchenyuan/QuietQuote/releases)
+
+Choose the Windows ZIP under **Assets** on the Releases page. The macOS port is an experimental preview; see its status below.
+
 # QuietQuote
 
 **Repository includes:** tested Windows source plus an **experimental native macOS port**. The Mac port has not yet been compiled or run in this Windows environment; its separate CI workflows must pass before an app is available. See [macOS preview](macos/README.md) and [simple Git upload instructions](UPLOAD.zh-CN.md).
@@ -14,7 +18,7 @@ Previews show example prices, not live quotes.
 
 ## Download and run
 
-Open this repository's **Releases** page and download `QuietQuote-v1.3.0-windows.zip` from **Assets**. Extract it into a writable folder and run `QuietQuote.exe`. Exit a previous instance from its tray menu before upgrading. You can copy your old `settings.json` into the new folder.
+Open the [**Releases download page**](https://github.com/Fred-Huangchenyuan/QuietQuote/releases) and download `QuietQuote-v1.3.0-windows.zip` from **Assets**. Extract it into a writable folder and run `QuietQuote.exe`. Exit a previous instance from its tray menu before upgrading. You can copy your old `settings.json` into the new folder.
 
 Windows 10/11 with .NET Framework 4.8 is the recommended environment. No installer, administrator privileges, exchange credentials, or separate font installation is needed. Builds are currently unsigned.
 
