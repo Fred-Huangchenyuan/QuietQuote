@@ -5,10 +5,12 @@ $Stage = Join-Path $RepoRoot ('.build/package/' + [guid]::NewGuid().ToString('N'
 $Dist = Join-Path $RepoRoot 'dist'
 New-Item -ItemType Directory -Path $Stage,$Dist -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $RepoRoot '.build/app/QuietQuote.exe') -Destination $Stage
-foreach ($name in @('LICENSE','README.md','README.zh-CN.md','CONTRIBUTING.md','CHANGELOG.md','version.txt')) {
+foreach ($name in @('LICENSE','README.md','README.zh-CN.md','UPLOAD.zh-CN.md','CONTRIBUTING.md','CHANGELOG.md','version.txt')) {
     Copy-Item -LiteralPath (Join-Path $RepoRoot $name) -Destination $Stage
 }
 Copy-Item -LiteralPath (Join-Path $RepoRoot 'docs') -Destination (Join-Path $Stage 'docs') -Recurse
+New-Item -ItemType Directory -Path (Join-Path $Stage 'macos') -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $RepoRoot 'macos/README.md') -Destination (Join-Path $Stage 'macos/README.md')
 $Zip = Join-Path $Dist "QuietQuote-v$Version-windows.zip"
 Compress-Archive -Path (Join-Path $Stage '*') -DestinationPath $Zip -Force
 $Hash = (Get-FileHash -LiteralPath $Zip -Algorithm SHA256).Hash.ToLowerInvariant()

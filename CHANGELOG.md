@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4.0 — 2026-11-06
+
+- Windows: public OKX/Binance spot and perpetual data; Binance contracts are USDⓈ-M perpetuals.
+- Configure 1–8 overlays with independent exchanges, markets, pairs and positions.
+- Shared appearance/refresh settings, one tray and one global hide/show shortcut.
+- Preserve v1.3 settings and isolate catalog caches by source; reject late responses after source changes.
+- Explicit receipt-time label for Binance spot; last-known price remains marked Offline on failures.
+- Added core, desktop race/error/multi-window tests and opt-in four-market live checks.
+- macOS preview feature set is unchanged (one OKX perpetual window).
+
 ## Unreleased macOS preview
 
 - Added native Swift/AppKit/SwiftUI source, offline Swift tests and architecture-specific packaging.

@@ -1,15 +1,13 @@
-# Launch validation — 2026-11-06
+# Windows v1.4.0 validation — 2026-11-06
 
-The `QuietQuote-GitHub` folder additionally includes experimental macOS sources. No Swift/macOS toolchain is available here: Swift compilation, XCTest execution, app launch, rendering and signing verification are pending on macOS. Workflow preparation is not evidence of a successful Mac build. See `macos/README.md` for the acceptance checklist.
+- Core suite: 48 offline checks covering decimal prices, instrument/market identity, invalid responses, source routing, catalog filtering, timestamp handling, v1.3 migration and independent window persistence.
+- Desktop suite: 68 checks covering native rendering, EN/ZH settings, controlled background sampling, multiple overlays, hide/restore, resize of the window collection, and deterministic HTTP race/error scenarios. Test files and preferences live in isolated .build/tests directories.
+- Four-market live suite: the app's own Feed client successfully loaded catalogs and fetched fresh BTC quotes for OKX spot/perpetual and Binance spot/USDⓈ-M perpetual. Observed catalog sizes: 1210, 543, 1366 and 555 respectively; these counts change over time.
+- Binance spot full catalog exceeded the buffer limit when including permission sets. The final implementation requests showPermissionSets=false and symbolStatus=TRADING; the corrected request passed live validation with the bounded buffer intact.
+- Settings form renderings inspected in Chinese and English. Glass compositor appearance, all DPI/monitor combinations, every instrument, and regional network restrictions are not exhaustively verified.
 
-The v1.3.0 application source matches the locally delivered v1.3 feature build. The launch package adds assembly version metadata, repository structure, documentation and build/test/package scripts.
+Binance spot price tickers lack a trade timestamp. The UI labels local receipt time explicitly; this is not proof of recent trading activity.
 
-Performed locally on Windows:
+macOS sources are unchanged in feature scope: one OKX perpetual overlay. No Swift/macOS toolchain is available in this Windows environment; no Mac compilation, execution, signing or new-feature parity is claimed.
 
-- `scripts/package.ps1`: compilation succeeded; 23 offline core checks passed; versioned ZIP and SHA256 checksum generated.
-- `scripts/test.ps1 -Desktop`: 38 checks passed, including rendering, language selection, preference persistence and actual pixel sampling against controlled white/black windows.
-- The preceding v1.3 iteration also passed live OKX KORU and BTC-USD quote, refresh and instrument-switch checks; these network checks were not repeated solely for repository packaging.
-
-The packaged application is unsigned. GitHub Actions has been configured and checked against current action documentation but has not run in a GitHub repository yet. Native blur API acceptance does not verify the final compositor appearance on every machine. See the README for other compatibility limits.
-
-Neither a remote repository nor a GitHub Release has been created by this preparation step.
+Build scripts produce an unsigned executable and Windows ZIP/checksum. This local update does not itself push commits, create a GitHub tag, run remote CI or publish a Release.

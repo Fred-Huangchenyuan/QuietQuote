@@ -4,6 +4,8 @@
 
 The Windows version remains the tested release. This macOS implementation uses Swift, SwiftUI and AppKit instead of Windows Forms.
 
+**Feature scope:** the Windows v1.4.0 release adds Binance, spot markets and multiple overlays. This macOS preview still supports one OKX perpetual overlay; those new features are not ported here.
+
 ## Implemented in source
 
 - Borderless floating capsule/circle, draggable via its hosting view.

@@ -77,9 +77,9 @@ public static class QuoteTests {
     using (var b = f.RenderSurface()) b.Save("work/glass-stale.png");
     f.Close();
    }
-   using (var f = new Options(new Settings())) {
+   using (var f = new Options(new Settings(),0,new Feed(),false)) {
     f.Show(); Application.DoEvents();
-    ComboBox coin = null, unit = null,language=null; foreach(Control c in f.Controls) if(c is ComboBox) { if(c.Top == 60) coin = (ComboBox)c; else if(c.Top==100)unit = (ComboBox)c; else if(c.Top==20)language=(ComboBox)c; }
+    ComboBox coin=(ComboBox)f.Controls.Find("coin",true)[0],unit=(ComboBox)f.Controls.Find("unit",true)[0],language=(ComboBox)f.Controls.Find("language",true)[0];
     Check((string)coin.SelectedItem == "KORU" && (string)unit.SelectedItem == "USDT", "default KORU USDT selectors");
     coin.SelectedItem = "BTC"; Check(unit.Items.Contains("USD") && (string)unit.SelectedItem == "USDT", "coin switch defaults USDT and lists supported units");
     unit.SelectedItem = "USD";
@@ -120,6 +120,7 @@ public static class QuoteTests {
     Check(Settings.Load().Interval == 1,"window preserves refresh settings on close");
     File.Delete(Settings.FilePath);
    }
+   checks += WindowTests.Run();
    Console.WriteLine("ALL PASSED: " + checks); return 0;
   } catch(Exception e) { Console.Error.WriteLine(e); return 1; }
  }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Drawing;
@@ -21,6 +21,18 @@ public sealed class Settings {
     public bool Symbol = false;
     public bool Top = true;
     public string InstrumentId = Quote.Instrument;
+    public string Exchange = "OKX", Kind = "SWAP";
+    public List<WindowSpec> Windows;
+    public Settings Copy() { return new JavaScriptSerializer().Deserialize<Settings>(new JavaScriptSerializer().Serialize(this)); }
+    public void EnsureWindows() {
+        Normalize();
+        if (Windows == null || Windows.Count == 0) Windows = new List<WindowSpec> { new WindowSpec { Exchange=Exchange, Kind=Kind, InstrumentId=InstrumentId, X=X, Y=Y } };
+        Windows = Windows.Take(8).Select(x => x ?? new WindowSpec()).ToList();
+        foreach (var window in Windows) window.Normalize();
+    }
+    public Settings ForWindow(WindowSpec w) {
+        var s = (Settings)MemberwiseClone(); s.Windows=null; s.Exchange=w.Exchange; s.Kind=w.Kind; s.InstrumentId=w.InstrumentId; s.X=w.X; s.Y=w.Y; return s;
+    }
     public int Diameter = 88;
     public bool Glass = true;
     public string Language = "zh";
@@ -32,7 +44,8 @@ public sealed class Settings {
         Interval = Math.Max(1, Math.Min(3600, Interval)); Alpha = Math.Max(30, Math.Min(100, Alpha)); FontSize = Math.Max(10, Math.Min(28, FontSize)); Diameter = Math.Max(64, Math.Min(180, Diameter));
         CapsuleHeight = Math.Max(36, Math.Min(100, CapsuleHeight)); CapsuleWidth = Math.Max(CapsuleHeight + 40, Math.Max(100, Math.Min(360, CapsuleWidth)));
         if (Language != "en") Language = "zh"; if (Shape != "circle") Shape = "capsule"; if (Theme != "light" && Theme != "dark") Theme = "auto";
-        if (Market.FromId(InstrumentId) == null) InstrumentId = Quote.Instrument;
+        var source = new WindowSpec { Exchange=Exchange, Kind=Kind, InstrumentId=InstrumentId }; source.Normalize();
+        Exchange=source.Exchange; Kind=source.Kind; InstrumentId=source.InstrumentId;
     }
     public static string FilePath { get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json"); } }
     public static Settings Load() { try { var s = new JavaScriptSerializer().Deserialize<Settings>(File.ReadAllText(FilePath)); s.Normalize(); return s; } catch { return new Settings(); } }
@@ -42,67 +55,12 @@ public sealed class Settings {
         if (File.Exists(FilePath)) File.Replace(tmp, FilePath, null); else File.Move(tmp, FilePath);
     }
 }
-public sealed class TickerEnvelope { public string code; public string msg; public TickerRow[] data; }
-public sealed class TickerRow { public string instId; public string instType; public string last; public string ts; }
-public sealed class Market {
-    public string Id, Coin, Unit;
-    public static Market FromId(string id) {
-        if (String.IsNullOrEmpty(id) || id.Length > 80 || !System.Text.RegularExpressions.Regex.IsMatch(id, @"^[A-Z0-9]+-(USDT|USDC|USD)-SWAP$")) return null;
-        var p = id.Split('-'); return new Market { Id = id, Coin = p[0], Unit = p[1] };
-    }
-    public static List<Market> Parse(string json) {
-        var r = new JavaScriptSerializer { MaxJsonLength = 4194304 }.Deserialize<CatalogEnvelope>(json);
-        if (r == null || r.code != "0" || r.data == null) throw new InvalidDataException("合约列表获取失败");
-        var list = r.data.Where(x => x != null && x.instType == "SWAP" && x.state == "live").Select(x => FromId(x.instId)).Where(x => x != null).GroupBy(x => x.Id).Select(x => x.First()).OrderBy(x => x.Coin).ThenBy(x => x.Unit).ToList();
-        if (list.Count == 0) throw new InvalidDataException("没有可用合约"); return list;
-    }
-}
-public sealed class CatalogEnvelope { public string code; public CatalogRow[] data; }
-public sealed class CatalogRow { public string instId, instType, state; }
-public sealed class Quote {
-    public const string Instrument = "KORU-USDT-SWAP";
-    public decimal Price;
-    public string InstrumentId;
-    public DateTime TimeUtc;
-    public string Display { get { return Price.ToString("0.####################", CultureInfo.InvariantCulture); } }
-    public static Quote Parse(string json, string expected = Instrument) {
-        var response = new JavaScriptSerializer().Deserialize<TickerEnvelope>(json);
-        if (response == null || response.code != "0") throw new InvalidDataException("OKX 返回错误 " + (response == null ? "" : response.code));
-        if (response.data == null || response.data.Length != 1) throw new InvalidDataException("合约行情不可用");
-        var row = response.data[0]; decimal price; long stamp;
-        if (row == null || row.instId != expected || row.instType != "SWAP") throw new InvalidDataException("返回的合约不匹配");
-        if (!decimal.TryParse(row.last, NumberStyles.Float, CultureInfo.InvariantCulture, out price) || price <= 0) throw new InvalidDataException("价格无效");
-        if (!long.TryParse(row.ts, out stamp) || stamp <= 0) throw new InvalidDataException("行情时间无效");
-        try { return new Quote { InstrumentId = expected, Price = price, TimeUtc = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMilliseconds(stamp) }; }
-        catch (ArgumentOutOfRangeException) { throw new InvalidDataException("行情时间超出范围"); }
-    }
-    public bool IsOld(DateTime now, int interval) { return (now - TimeUtc).TotalSeconds > Math.Max(90, interval + 30) || (TimeUtc - now).TotalSeconds > 60; }
-}
-public sealed class Feed : IDisposable {
-    readonly HttpClient client;
-    public Feed() {
-        ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-        client = new HttpClient(new HttpClientHandler { UseProxy = true, DefaultProxyCredentials = CredentialCache.DefaultCredentials });
-        client.Timeout = TimeSpan.FromSeconds(10);
-        client.MaxResponseContentBufferSize = 4194304;
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("QuietQuote/1.3");
-        client.DefaultRequestHeaders.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true, NoStore = true };
-    }
-    public Task<Quote> Fetch(CancellationToken token) { return Fetch(Quote.Instrument, token); }
-    public async Task<Quote> Fetch(string instrument, CancellationToken token) {
-        if (Market.FromId(instrument) == null) throw new InvalidDataException("合约代码无效");
-        using (var r = await client.GetAsync("https://www.okx.com/api/v5/market/ticker?instId=" + Uri.EscapeDataString(instrument), token)) {
-            r.EnsureSuccessStatusCode(); return Quote.Parse(await r.Content.ReadAsStringAsync(), instrument);
-        }
-    }
-    public async Task<string> Catalog(CancellationToken token) {
-        using (var r = await client.GetAsync("https://www.okx.com/api/v5/public/instruments?instType=SWAP", token)) { r.EnsureSuccessStatusCode(); return await r.Content.ReadAsStringAsync(); }
-    }
-    public void Dispose() { client.Dispose(); }
-}
 public sealed class QuoteWindow : Form {
     Settings settings;
-    readonly Feed feed = new Feed();
+    readonly Feed feed;
+    readonly DesktopSession session;
+    readonly bool primary;
+    internal Settings CurrentSettings { get { return settings; } }
     readonly CancellationTokenSource cancel = new CancellationTokenSource();
     readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 500 };
     readonly NotifyIcon tray;
@@ -131,19 +89,21 @@ public sealed class QuoteWindow : Form {
     }
     protected override CreateParams CreateParams { get { var p = base.CreateParams; p.ExStyle |= 0x80000; return p; } }
     protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); if (settings != null) { glassActive = GlassComposition.Enable(Handle, settings.Glass); lastRender = ""; } }
-    public QuoteWindow(bool previewMode) {
-        preview = previewMode; settings = preview ? new Settings() : Settings.Load();
+    public QuoteWindow(bool previewMode) : this(previewMode, null, null, true, null) { }
+    internal QuoteWindow(bool previewMode, Settings initial, DesktopSession owner, bool isPrimary, Feed source) {
+        preview = previewMode; session=owner; primary=isPrimary; feed=source ?? new Feed();
+        settings = initial ?? (preview ? new Settings() : Settings.Load()); settings.Normalize();
         Text = "QuietQuote"; ShowInTaskbar = false; FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.Manual; BackColor = Color.FromArgb(241, 243, 246);
         DoubleBuffered = true; AutoScaleMode = AutoScaleMode.None;
         Icon = MakeIcon();
-        tray = new NotifyIcon { Icon = Icon, Text = "QuietQuote · KORU", Visible = !preview };
+        tray = new NotifyIcon { Icon = Icon, Text = "QuietQuote · KORU", Visible = !preview && primary };
         menu.Items.Add("显示 / 隐藏    Ctrl+Alt+Q", null, delegate { Toggle(); });
         menu.Items.Add("设置…", null, delegate { OpenOptions(); });
         menu.Items.Add("立即刷新", null, async delegate { if ((DateTime.UtcNow - started).TotalSeconds >= 1) await RefreshQuote(); });
-        menu.Items.Add("移回主屏幕", null, delegate { PlaceDefault(); Show(); Save(); });
+        menu.Items.Add("移回主屏幕", null, delegate { if (session != null) session.Arrange(); else { PlaceDefault(); Show(); Save(); } });
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("退出", null, delegate { Close(); });
+        menu.Items.Add("退出", null, delegate { if (session != null) session.Quit(); else Close(); });
         ContextMenuStrip = menu; tray.ContextMenuStrip = menu;
         tray.DoubleClick += delegate { Toggle(); };
         Apply();
@@ -158,8 +118,8 @@ public sealed class QuoteWindow : Form {
         timer.Tick += async delegate { UpdateTheme(); UpdateStatus(); if (!busy && DateTime.UtcNow >= next) await RefreshQuote(); };
         Shown += async delegate {
             if (preview) return;
-            hotkey = RegisterHotKey(Handle, 1, 0x4003, (uint)Keys.Q);
-            if (!hotkey) tray.ShowBalloonTip(5000, "QuietQuote", T("Ctrl+Alt+Q 已被占用。可双击托盘图标显示或隐藏。", "Ctrl+Alt+Q is in use. Double-click the tray icon to show or hide."), ToolTipIcon.Info);
+            hotkey = primary && RegisterHotKey(Handle, 1, 0x4003, (uint)Keys.Q);
+            if (primary && !hotkey) tray.ShowBalloonTip(5000, "QuietQuote", T("Ctrl+Alt+Q 已被占用。可双击托盘图标显示或隐藏。", "Ctrl+Alt+Q is in use. Double-click the tray icon to show or hide."), ToolTipIcon.Info);
             timer.Start(); await RefreshQuote();
         };
     }
@@ -175,6 +135,7 @@ public sealed class QuoteWindow : Form {
     void Save() {
         if (preview) return;
         settings.X = Left; settings.Y = Top;
+        if (session != null) { session.Save(); return; }
         try { settings.Save(); } catch { tray.ShowBalloonTip(3000, "QuietQuote", T("设置未能保存，请将程序放在可写入的文件夹。", "Could not save settings. Use a writable folder."), ToolTipIcon.Info); }
     }
     void Apply() {
@@ -188,8 +149,9 @@ public sealed class QuoteWindow : Form {
         if (settings.Theme != "auto") { lightTheme=settings.Theme=="light";return; }
         if (Visible && !preview && DateTime.UtcNow>=nextTheme) { nextTheme=DateTime.UtcNow.AddSeconds(1);lightTheme=Appearance.NearbyLight(Bounds,lightTheme); }
     }
-    void Toggle() { if (Visible) Hide(); else { Show(); UpdateStatus(); } }
+    void Toggle() { if (session != null) { session.Toggle(); return; } if (Visible) Hide(); else { Show(); UpdateStatus(); } }
     void OpenOptions() {
+        if (session != null) { session.OpenOptions(this); return; }
         using (var dialog = new Options(settings)) {
             dialog.TopMost = settings.Top;
             if (dialog.ShowDialog() == DialogResult.OK) { UseSettings(dialog.Result); Save(); }
@@ -197,7 +159,7 @@ public sealed class QuoteWindow : Form {
     }
     internal void UseSettings(Settings value) {
         value.Normalize();
-        if (value.InstrumentId != settings.InstrumentId) { generation++; quote = null; fetched = DateTime.MinValue; failure = ""; errors = 0; }
+        if (value.InstrumentId != settings.InstrumentId || value.Exchange != settings.Exchange || value.Kind != settings.Kind) { generation++; quote = null; fetched = DateTime.MinValue; failure = ""; errors = 0; }
         settings = value; Apply(); next = DateTime.UtcNow;
     }
     public async Task RefreshQuote() {
@@ -206,7 +168,7 @@ public sealed class QuoteWindow : Form {
         int requestGeneration = generation;
         string instrument = settings.InstrumentId;
         try {
-            var q = await feed.Fetch(instrument, cancel.Token);
+            var q = await feed.Fetch(settings.Exchange, settings.Kind, instrument, cancel.Token);
             if (closing || requestGeneration != generation) return;
             if (quote != null && q.TimeUtc < quote.TimeUtc) throw new InvalidDataException("收到较旧行情，等待更新");
             quote = q; fetched = DateTime.UtcNow; failure = ""; errors = 0;
@@ -236,17 +198,17 @@ public sealed class QuoteWindow : Form {
             ClientSize = new Size(w, h);
             using (var p = Appearance.Outline(new RectangleF(0,0,Width-1,Height-1),settings.Shape=="circle")) { var old = Region; Region = new Region(p); if (old != null) old.Dispose(); }
         }
-        var market = Market.FromId(settings.InstrumentId);
-        string info = "OKX · " + market.Id + "\n" + T("最新成交价", "Last trade") + " (" + market.Unit + ") · " + settings.Interval + T(" 秒刷新\n", "s refresh\n");
-        if (quote != null) info += T("行情时间：", "Quote time: ") + quote.TimeUtc.ToLocalTime().ToString("MM-dd HH:mm:ss") + "\n";
+        var market = Market.FromId(settings.InstrumentId, settings.Kind);
+        string info = settings.Exchange + " · " + (settings.Kind == "SPOT" ? T("现货", "Spot") : T("永续", "Perpetual")) + " · " + market.Id + "\n" + T("最新成交价", "Last trade") + " (" + market.Unit + ") · " + settings.Interval + T(" 秒刷新\n", "s refresh\n");
+        if (quote != null) info += (quote.ReceiptTime ? T("接收时间（接口无成交时间）：", "Received (no trade timestamp): ") : T("行情时间：", "Quote time: ")) + quote.TimeUtc.ToLocalTime().ToString("MM-dd HH:mm:ss") + "\n";
         if (failure!="") info+=T("行情暂不可用，自动重试中。\n","Market data unavailable. Retrying automatically.\n");
         else if(State()!="" && quote!=null)info+=T("行情过期或系统时钟偏差，请核对。\n","Stale data or clock discrepancy. Please check.\n");
         info += T("拖动移动 · 右键设置 · Ctrl+Alt+Q 隐藏", "Drag to move · Right-click settings · Ctrl+Alt+Q to hide");
         if (settings.Glass && !glassActive) info += T("\n当前使用半透明兼容外观", "\nUsing translucent compatibility appearance");
         if (info != lastTip) { tip.SetToolTip(this, info); lastTip = info; }
-        string trayText = market.Coin + " / " + market.Unit + " " + Caption() + " " + State();
+        string trayText = settings.Exchange + " " + market.Coin + " / " + market.Unit + " " + Caption() + " " + State();
         tray.Text = trayText.Substring(0, Math.Min(63, trayText.Length));
-        string render = Caption() + State() + settings.Symbol + settings.InstrumentId + Width + Height + settings.FontSize + settings.Alpha + glassActive + lightTheme + settings.Language + settings.Shape;
+        string render = Caption() + State() + settings.Symbol + settings.Exchange + settings.Kind + settings.InstrumentId + Width + Height + settings.FontSize + settings.Alpha + glassActive + lightTheme + settings.Language + settings.Shape;
         if (render != lastRender && IsHandleCreated) { RenderGlass(); lastRender = render; }
     }
     void RenderGlass() { using (var bitmap = RenderSurface()) GlassComposition.Present(Handle, bitmap, Location); }
@@ -273,7 +235,7 @@ public sealed class QuoteWindow : Form {
             Color digit=light?Color.FromArgb(27,67,68):Color.FromArgb(210,250,240);
             SegmentDigits.Draw(g,Caption(),rect,numberHeight,digit);
             if(settings.Symbol) {
-                var m=Market.FromId(settings.InstrumentId);
+                var m=Market.FromId(settings.InstrumentId, settings.Kind);
                 DrawCentered(g,m.Coin+" / "+m.Unit,Math.Min(8,Font.Size),new Rectangle(Width/7,circle?Height/6:4,Width*5/7,small),light?Color.FromArgb(74,102,103):Color.FromArgb(210,225,240));
             }
             if(State()!="")DrawCentered(g,State(),Math.Min(8,Font.Size),new Rectangle(Width/7,circle?Height*2/3:Height-small-4,Width*5/7,small),light?Color.FromArgb(137,79,28):Color.FromArgb(255,211,153));
@@ -300,6 +262,9 @@ public sealed class QuoteWindow : Form {
         if ((m.Msg == 0x031E || m.Msg == 0x001A) && settings != null && IsHandleCreated) { glassActive = GlassComposition.Enable(Handle, settings.Glass); lastRender = ""; UpdateStatus(); }
     }
     protected override void OnFormClosing(FormClosingEventArgs e) {
+        if (session != null && !session.ManagingClose && e.CloseReason == CloseReason.UserClosing) {
+            e.Cancel = true; BeginInvoke(new Action(session.Quit)); return;
+        }
         closing = true; timer.Stop(); cancel.Cancel(); if (hotkey) UnregisterHotKey(Handle, 1); Save();
         tray.Visible = false; base.OnFormClosing(e);
     }
@@ -340,7 +305,7 @@ static class Program {
         using (var mutex = new Mutex(true, "Local\\QuietQuote.KORU.Price.v1", out created)) {
             if (!created) { MessageBox.Show(Settings.Load().Language == "en" ? "QuietQuote is already running. Use Ctrl+Alt+Q or the tray icon to restore it." : "QuietQuote 已在运行。请使用 Ctrl+Alt+Q 或托盘图标恢复窗口。", "QuietQuote"); return; }
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new QuoteWindow(false));
+            Application.Run(new DesktopSession());
         }
     }
 }

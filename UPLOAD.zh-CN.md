@@ -1,46 +1,102 @@
-# 直接从这个文件夹提交到 GitHub
+# 用 VS Code 更新源码并发布 v1.4.0
 
-当前文件夹就是完整仓库根目录：Windows正式源码、macOS预览源码、README、MIT许可证、构建脚本与GitHub Actions都在这里。没有个人配置、行情缓存或Git历史。
+已有 GitHub 仓库时，不需要再次 git init、新建仓库或重复添加 origin，也不需要安装 GitHub CLI。
+下面每个命令按顺序执行；某一步报错就先停在该步。
 
-## 一次性设置
+## 1. 打开仓库
 
-先在 GitHub 网页新建一个空仓库（不要额外勾选README或LICENSE），复制它的HTTPS地址。
-在 VS Code 中打开此文件夹，然后在 PowerShell 终端运行：
+VS Code → File → Open Folder，选择含 .git、README.md、src、scripts 的现有仓库文件夹。
+Terminal → New Terminal，使用 PowerShell，执行：
 
 ```powershell
-git init -b main
+git status
+git branch --show-current
+git remote -v
+```
+
+本次交付使用的分支是 main，origin 为 https://github.com/Fred-Huangchenyuan/QuietQuote。
+如果看到 not a git repository，说明终端目录不对；切回现有仓库，别在上级目录初始化新仓库。
+
+## 2. 本地试用与打包
+
+本次已提供测试过的 v1.4.0 Windows ZIP，可以直接上传。自行修改源码后应重新生成：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package.ps1
+```
+
+成功后 dist 内有 QuietQuote-v1.4.0-windows.zip 和 SHA256SUMS.txt。
+先从系统托盘退出旧版，解压新 ZIP 到一个可写文件夹，运行 QuietQuote.exe。
+需要保留旧设置时，在启动新版前把旧 settings.json 复制到新版 EXE 旁。
+
+右键浮窗 → 设置 → 行情窗口：
+
+1. 将“并行窗口数量”设为需要的数量，例如 3。
+2. “正在配置的窗口”选窗口 1，设置 OKX / 永续 / 原币种。
+3. 选窗口 2，设置 Binance / 现货 / BTC / USDT。
+4. 选窗口 3，设置 Binance / 永续 / ETH / USDT。
+5. 外观与刷新页调整共享设置，然后保存。
+
+可选验证：scripts/test.ps1 -Desktop 做本地桌面测试；scripts/test.ps1 -MarketLive 联网检查四类公共行情。
+
+## 3. 提交并推送源码
+
+回到 VS Code 的仓库终端，逐条执行：
+
+```powershell
+git status --short
 git add .
-git commit -m "Initial release: Windows ticker and macOS preview"
-git remote add origin https://github.com/YOUR_NAME/QuietQuote.git
-git push -u origin main
+git diff --cached --stat
+git commit -m "feat: add Binance, spot markets and multiple windows"
+git push origin main
 ```
 
-把 `YOUR_NAME` 换成自己的账号。如 Git 提示缺少身份，再设置当前仓库的名字与提交邮箱，然后重新执行 commit：
+顺序是 **add → commit → push**。add 暂存改动，commit 保存本地版本，push 上传到 GitHub。
+.gitignore 已排除 EXE、ZIP、.build、dist、个人设置及行情缓存；它们不会通过上述 git add . 被加入源码提交。
+检查暂存清单，确认没有夹带自己另外放入仓库的私人文件。
+
+首次认证按 Git/VS Code 提示在浏览器登录 GitHub。若提示 Author identity unknown，仅在当前仓库设置你的姓名和提交邮箱，再重新执行 commit：
 
 ```powershell
-git config user.name "YOUR_NAME"
-git config user.email "YOUR_GITHUB_COMMIT_EMAIL"
+git config user.name "你的 GitHub 昵称"
+git config user.email "你的 GitHub 提交邮箱"
 ```
 
-这里不需要 GitHub CLI。Git/VS Code 会在需要时引导你登录。顺序是 **add → commit → push**。不要把远端地址放在推送命令之前误执行两套初始化教程。
-
-## 后续修改
+若提示 non-fast-forward 或 fetch first：不要强推。先确保本地改动已提交，再运行：
 
 ```powershell
-git add .
-git commit -m "Describe your change"
-git push
+git pull --rebase origin main
+git push origin main
 ```
 
-## 上传后的产物
+如果 rebase 报冲突，停止后续步骤，先解决冲突；不要覆盖远端内容。
 
-GitHub Actions 会出现：
+## 4. 查看 GitHub 自动构建
 
-- **Windows build**：构建并测试 Windows 正式版。
-- **macOS preview build**：分别在 Apple Silicon 和 Intel 上尝试构建并测试 Mac 预览版。
+打开仓库 → **Actions** → **Windows build**，选择本次 commit，等待绿色勾。
+Actions 的 Artifact 是构建产物；成功构建不会自动创建公开 Release。
+Mac 工作流单独处理；本次 Windows 新功能尚未移植到 Mac。
 
-各任务成功后，在该次运行页面的 **Artifacts** 下载ZIP。Actions不会自动创建Release。
+## 5. 创建真正可下载的 Release
 
-**Mac源码目前未在Mac上编译或运行。必须先看CI结果，再到真实Mac上测试。** 已完成和待完成的范围见 [macos/README.md](macos/README.md)。如果某个Mac任务失败，把日志交给维护者修复，不要把它当成已可用的Mac发行包。
+打开 [创建 Release](https://github.com/Fred-Huangchenyuan/QuietQuote/releases/new)：
 
-对外发布时，在GitHub的Releases页面创建版本并上传Windows ZIP；Mac建议单独使用预发布版本，如 `v1.3.0-macos-preview.1`，并注明未经Developer ID签名/公证。普通用户无需下载源码来运行Windows版。
+1. Choose a tag / Select tag：输入 v1.4.0，选择创建这个新标签。
+2. Target：选择 main，确认此时已含刚才推送的新 commit。
+3. Release title：填 QuietQuote v1.4.0。
+4. 描述：复制 docs/releases/v1.4.0.md 的正文。
+5. 在附件区域上传 dist/QuietQuote-v1.4.0-windows.zip 和 dist/SHA256SUMS.txt。
+6. 等两个文件全部上传完成；这次是 Windows 正式版，不勾 Set as a pre-release。
+7. 如果显示 Set as the latest release，将它选中；最后点击 Publish release。
+
+如果 v1.4.0 已存在，先检查对应 Release 是否就是这次版本；不要删除或覆盖旧标签来强行发布不同内容。
+
+## 6. 验证访客下载
+
+打开仓库 README，点击第一行下载链接。应看到 v1.4.0，在 Assets 中看到 Windows ZIP。
+用无痕窗口再下载一次，确认普通访客可访问；解压后应有 QuietQuote.exe。
+GitHub 自动附带的 Source code (zip) 是源码，不是 Windows 应用包。
+
+以后发布新版本：更新 version.txt、更新日志和 release notes，重新打包，再用新版本号重复步骤 3–6。
+
+官方参考：[提交本地代码](https://docs.github.com/en/migrations/importing-source-code/using-the-command-line-to-import-source-code/adding-locally-hosted-code-to-github)、[管理 Releases](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository)。

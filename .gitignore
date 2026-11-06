@@ -4,6 +4,7 @@
 **/settings.json
 **/settings.json.tmp
 **/markets.json
+**/markets-*.json
 *.exe
 *.dll
 *.pdb

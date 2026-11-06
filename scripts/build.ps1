@@ -6,7 +6,7 @@ $Info = @"
 using System.Reflection;
 [assembly: AssemblyTitle("QuietQuote")]
 [assembly: AssemblyProduct("QuietQuote")]
-[assembly: AssemblyDescription("A lightweight OKX perpetual-price desktop ticker")]
+[assembly: AssemblyDescription("A lightweight multi-window OKX and Binance desktop ticker")]
 [assembly: AssemblyVersion("$Version.0")]
 [assembly: AssemblyFileVersion("$Version.0")]
 [assembly: AssemblyInformationalVersion("$Version")]
